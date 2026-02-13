@@ -1,7 +1,7 @@
 ## Screenshots
 
 ### S3 Bucket
-![Bucket](s3-bucket-list.png)
+![Bucket](s3Bucket.png)
 
 ### Bucket Contents
 ![Contents](bucketContents.png)
