@@ -4,7 +4,7 @@
 ![Bucket](s3-bucket-list.png)
 
 ### Bucket Contents
-![Contents](bucket-contents.png)
+![Contents](bucketContents.png)
 
 ### Static Hosting Enabled
 ![Hosting](static-hosting-enabled.png)
