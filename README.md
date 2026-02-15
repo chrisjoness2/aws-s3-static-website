@@ -12,3 +12,5 @@
 ### Website Live
 ![Website](website-live.png)
 
+### CloudFront CDN Integration
+![CloudFront Distribution](cloudFrontDistribution.png)
