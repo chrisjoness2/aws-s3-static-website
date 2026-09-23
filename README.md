@@ -31,6 +31,9 @@ terraform apply    # creates the S3 bucket + CloudFront distribution
 
 Terraform outputs the live CloudFront URL once `apply` finishes.
 
+## 🔗 Live Deployment
+👉 **[View the Live Website Here](d2un8vyyta381c.cloudfront.net)**
+
 ## Planned improvements
 
 - **Origin Access Control (OAC):** Currently the bucket is public because CloudFront targets the S3 website endpoint. A more secure pattern is pointing CloudFront at the S3 REST endpoint instead and using OAC to authenticate — this removes the need for any public bucket policy and keeps the bucket fully private end-to-end. Deliberately left as a next step rather than implemented here.
