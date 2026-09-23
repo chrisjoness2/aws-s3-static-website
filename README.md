@@ -32,7 +32,7 @@ terraform apply    # creates the S3 bucket + CloudFront distribution
 Terraform outputs the live CloudFront URL once `apply` finishes.
 
 ## 🔗 Live Deployment
-👉 **[View the Live Website Here](d2un8vyyta381c.cloudfront.net)**
+👉 **[View the Live Website Here](https://d2un8vyyta381c.cloudfront.net)**
 
 ## Planned improvements
 
