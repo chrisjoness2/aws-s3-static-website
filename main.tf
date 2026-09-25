@@ -13,51 +13,25 @@ provider "aws" {
 }
 
 # IMPORTANT: S3 bucket names must be globally unique across ALL of AWS.
-# Change this to something like "christianjones-devops-demo-2026" before running.
 variable "bucket_name" {
   description = "Globally unique S3 bucket name"
   type        = string
   default     = "christianjones-devops-demo-2026"
 }
 
-# --- S3 bucket that will hold and serve the website files ---
+# --- S3 bucket, fully private end-to-end ---
 resource "aws_s3_bucket" "site" {
   bucket = var.bucket_name
 }
 
-# Allow public read access (required for a public static website)
+# Block ALL public access - nothing reaches this bucket except CloudFront
 resource "aws_s3_bucket_public_access_block" "site" {
   bucket = aws_s3_bucket.site.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-resource "aws_s3_bucket_policy" "site" {
-  bucket     = aws_s3_bucket.site.id
-  depends_on = [aws_s3_bucket_public_access_block.site]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Sid       = "PublicReadGetObject"
-      Effect    = "Allow"
-      Principal = "*"
-      Action    = "s3:GetObject"
-      Resource  = "${aws_s3_bucket.site.arn}/*"
-    }]
-  })
-}
-
-# Turn the bucket into a static website
-resource "aws_s3_bucket_website_configuration" "site" {
-  bucket = aws_s3_bucket.site.id
-
-  index_document {
-    suffix = "index.html"
-  }
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 # Upload index.html automatically whenever its contents change
@@ -69,27 +43,35 @@ resource "aws_s3_object" "index" {
   etag         = filemd5("${path.module}/index.html")
 }
 
-# --- CloudFront distribution sitting in front of the S3 website ---
+# --- CloudFront Origin Access Control ---
+# This is what lets CloudFront authenticate to the private S3 bucket
+resource "aws_cloudfront_origin_access_control" "site" {
+  name                              = "${var.bucket_name}-oac"
+  description                       = "OAC for ${var.bucket_name} S3 origin"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+# --- CloudFront distribution, reaching the bucket only through OAC ---
 resource "aws_cloudfront_distribution" "site" {
   enabled             = true
   default_root_object = "index.html"
 
   origin {
-    domain_name = aws_s3_bucket_website_configuration.site.website_endpoint
-    origin_id   = "s3-website-origin"
+    domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
+    origin_id                = "s3-origin"
+    origin_access_control_id = aws_cloudfront_origin_access_control.site.id
 
-    custom_origin_config {
-      http_port              = 80
-      https_port              = 443
-      origin_protocol_policy = "http-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
+    s3_origin_config {
+      origin_access_identity = "" # not used - OAC handles auth instead
     }
   }
 
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD"]
     cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "s3-website-origin"
+    target_origin_id       = "s3-origin"
     viewer_protocol_policy = "redirect-to-https"
 
     forwarded_values {
@@ -111,8 +93,26 @@ resource "aws_cloudfront_distribution" "site" {
   }
 }
 
-output "s3_website_endpoint" {
-  value = aws_s3_bucket_website_configuration.site.website_endpoint
+# --- Bucket policy: ONLY this specific CloudFront distribution can read it ---
+resource "aws_s3_bucket_policy" "site" {
+  bucket     = aws_s3_bucket.site.id
+  depends_on = [aws_s3_bucket_public_access_block.site]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "AllowCloudFrontServicePrincipal"
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${aws_s3_bucket.site.arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = aws_cloudfront_distribution.site.arn
+        }
+      }
+    }]
+  })
 }
 
 output "cloudfront_url" {
